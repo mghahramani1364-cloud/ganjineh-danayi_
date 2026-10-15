@@ -1,0 +1,64 @@
+name: Build APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract project ZIP
+        run: |
+          mkdir -p project
+          unzip -q GanjineDanayi_MohammadAli_APK_BUILD_TEST_music_player.zip -d project
+          echo "--- extracted contents ---"
+          ls -la project/
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Find project root
+        id: findroot
+        run: |
+          ROOT=$(find project -name settings.gradle -type f | head -1 | xargs dirname)
+          echo "root=$ROOT" >> $GITHUB_OUTPUT
+          echo "Project root: $ROOT"
+          ls -la "$ROOT"
+
+      - name: Grant execute permission for gradlew
+        run: |
+          cd "${{ steps.findroot.outputs.root }}"
+          if [ -f gradlew ]; then chmod +x gradlew; fi
+
+      - name: Build APK with Gradle
+        run: |
+          cd "${{ steps.findroot.outputs.root }}"
+          gradle assembleDebug --no-daemon
+
+      - name: Find APK
+        id: findapk
+        run: |
+          APK=$(find project -name "*.apk" -type f | head -1)
+          echo "apk=$APK" >> $GITHUB_OUTPUT
+          echo "APK found at: $APK"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ganjineh-apk
+          path: ${{ steps.findapk.outputs.apk }}
+          if-no-files-found: error
